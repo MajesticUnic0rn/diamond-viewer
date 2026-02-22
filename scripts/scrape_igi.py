@@ -34,7 +34,7 @@ def scrape_report(report_number: str, headless: bool = False,
                   with_pdf: bool = False, with_plot: bool = False,
                   screenshot: bool = False) -> dict:
     url = f"https://www.igi.org/Verify-Your-Report/?r={report_number}"
-    out_dir = Path("reports") / report_number
+    out_dir = Path("public/data") / report_number
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
@@ -379,7 +379,7 @@ if __name__ == "__main__":
     print_report(data)
 
     # Save JSON
-    out_path = args.output or f"reports/{args.report_number}/{args.report_number}.json"
+    out_path = args.output or f"public/data/{args.report_number}/{args.report_number}.json"
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

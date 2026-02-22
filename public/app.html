@@ -459,7 +459,7 @@ html, body {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/",
-    "three-mesh-bvh": "./node_modules/three-mesh-bvh/src/index.js"
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.0/src/index.js"
   }
 }
 </script>
@@ -473,8 +473,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { createDiamondGeometry, classifyShape } from './diamond-geometry.js';
-import { createDiamondMaterial } from './diamond-material.js';
+import { createDiamondGeometry, classifyShape } from './js/diamond-geometry.js';
+import { createDiamondMaterial } from './js/diamond-material.js';
 
 // ── State ──
 let currentReport = null;
@@ -630,7 +630,7 @@ async function loadReport(reportNumber) {
     showLoader();
 
     try {
-        const resp = await fetch(`reports/${reportNumber}/${reportNumber}.json`);
+        const resp = await fetch(`data/${reportNumber}/${reportNumber}.json`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         currentReport = data;
@@ -750,7 +750,7 @@ function populateGradingCard(data) {
 
     // Clarity plot — use remote S3 URL by default, local file as override
     const plotImg = document.getElementById('clarityPlot');
-    const localPlot = `reports/${data.report_number}/clarity_plot.jpg`;
+    const localPlot = `data/${data.report_number}/clarity_plot.jpg`;
     const remotePlot = data.plot_image_url || '';
     plotImg.style.display = 'none';
     plotImg.onload = function() { this.style.display = ''; };
@@ -892,7 +892,7 @@ async function enterCompareMode() {
     const reportNum = rn.trim().toUpperCase();
 
     try {
-        const resp = await fetch(`reports/${reportNum}/${reportNum}.json`);
+        const resp = await fetch(`data/${reportNum}/${reportNum}.json`);
         if (!resp.ok) throw new Error('Not found');
         const data2 = await resp.json();
 

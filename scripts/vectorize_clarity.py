@@ -358,7 +358,7 @@ def draw_debug_overlay(img: np.ndarray, views_data: list[dict], left_w: int) -> 
 def main():
     args = parse_args()
     report_number = args.report_number
-    report_dir = Path("reports") / report_number
+    report_dir = Path("public/data") / report_number
 
     if not report_dir.exists():
         print(f"ERROR: Report directory not found at {report_dir}")

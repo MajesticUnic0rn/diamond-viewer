@@ -23,7 +23,7 @@ nul
 .claude/
 
 # Report binaries (keep .json files)
-reports/**/*.pdf
-reports/**/*.png
-reports/**/*.html
-reports/**/images/
+public/data/**/*.pdf
+public/data/**/*.png
+public/data/**/*.html
+public/data/**/images/

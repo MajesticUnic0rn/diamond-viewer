@@ -413,13 +413,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { createDiamondGeometry } from './diamond-geometry.js';
+import { createDiamondGeometry } from './js/diamond-geometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { createDiamondMaterial } from './diamond-material.js';
+import { createDiamondMaterial } from './js/diamond-material.js';
 
 // ── Setup ──
 const canvas  = document.getElementById('viewer');
@@ -580,7 +580,7 @@ function parseReport(r) {
 }
 
 // ── Load Report + Generate Parametric Geometry ──
-fetch('reports/LG689561771/LG689561771.json')
+fetch('data/LG689561771/LG689561771.json')
   .then(r => r.json())
   .then(raw => {
     const data = parseReport(raw);

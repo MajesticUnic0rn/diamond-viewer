@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--headless", action="store_true",
                         help="Run Playwright in headless mode")
     parser.add_argument("--output", "-o", type=str, default=None,
-                        help="Output JSON path (default: reports/{num}/{num}.json)")
+                        help="Output JSON path (default: public/data/{num}/{num}.json)")
     return parser.parse_args()
 
 
@@ -252,7 +252,7 @@ def main():
     args = parse_args()
     report_number = args.report_number
 
-    out_dir = Path("reports") / report_number
+    out_dir = Path("public/data") / report_number
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Fetch HTML

@@ -262,7 +262,7 @@ def main():
     args = parse_args()
     report_number = args.report_number
 
-    out_dir = Path("reports") / report_number
+    out_dir = Path("public/data") / report_number
     pdf_path = out_dir / f"{report_number}.pdf"
     json_path = out_dir / f"{report_number}.json"
 

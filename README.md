@@ -6,7 +6,7 @@ Interactive 3D diamond viewer and IGI grading report toolkit. Scrapes IGI certif
 
 ```bash
 # Serve and open in browser (no build step needed)
-npx serve .
+npx serve public
 # Open http://localhost:3000
 ```
 
@@ -16,35 +16,34 @@ All JavaScript dependencies (Three.js, three-mesh-bvh) are loaded via CDN — no
 
 ```
 diamond-viewer/
-├── app.html                  # Main viewer — search by report number, 3D diamond + grading card
-├── demo.html                 # Standalone demo — renders LG689561771 directly (no search UI)
-├── index.html                # Landing / redirect
-├── diamond-geometry.js       # Parametric diamond geometry generator (round, cushion, oval, pear, etc.)
-├── diamond-material.js       # BVH-based refraction material (three-mesh-bvh)
-├── scrape_igi.py             # Scrapes IGI verification page for report JSON, clarity plot, PDF
-├── fetch_igi.py              # Lower-level IGI fetcher (requests + Playwright fallback)
-├── verify_pdf.py             # Extracts clarity plot PNG from the PDF using pdfplumber + OpenCV
-├── vectorize_clarity.py      # Converts raster clarity plot to vector JSON (outlines, facets, inclusions)
-├── pyproject.toml            # Python deps (opencv, pdfplumber, playwright, requests)
-├── package.json              # JS deps (three, three-mesh-bvh)
-├── vercel.json               # Vercel deployment config
-└── reports/
-    └── LG689561771/
-        ├── LG689561771.json        # Report metadata (4Cs, measurements, proportions)
-        ├── LG689561771.pdf         # Original IGI certificate PDF
-        ├── clarity_plot.png        # Extracted raster clarity plot
-        ├── clarity_debug.png       # Debug overlay (vectors drawn on raster)
-        ├── clarity_vectors.json    # Vectorized clarity data (outlines, facet lines, inclusions)
-        └── images/                 # All images extracted from the PDF
+├── public/                         # Static site root (Vercel serves this)
+│   ├── index.html                  # Landing / redirect
+│   ├── app.html                    # Main viewer — search by report number, 3D diamond + grading card
+│   ├── demo.html                   # Standalone demo — renders LG689561771 directly (no search UI)
+│   ├── js/
+│   │   ├── diamond-geometry.js     # Parametric diamond geometry generator (round, cushion, oval, pear, etc.)
+│   │   └── diamond-material.js     # BVH-based refraction material (three-mesh-bvh)
+│   └── data/
+│       └── LG689561771/
+│           ├── LG689561771.json    # Report metadata (4Cs, measurements, proportions)
+│           └── clarity_vectors.json# Vectorized clarity data (outlines, facet lines, inclusions)
+├── scripts/                        # Python IGI scraping pipeline
+│   ├── fetch_igi.py                # Lower-level IGI fetcher (requests + Playwright fallback)
+│   ├── scrape_igi.py               # Scrapes IGI verification page for report JSON, clarity plot, PDF
+│   ├── verify_pdf.py               # Extracts clarity plot PNG from the PDF using pdfplumber + OpenCV
+│   └── vectorize_clarity.py        # Converts raster clarity plot to vector JSON (outlines, facets, inclusions)
+├── pyproject.toml                  # Python deps (opencv, pdfplumber, playwright, requests)
+├── package.json                    # JS deps (three, three-mesh-bvh)
+└── vercel.json                     # Vercel deployment config
 ```
 
 ## Pages
 
-### `app.html` — Main Viewer
+### `public/app.html` — Main Viewer
 
 Full report viewer with search. Enter any IGI report number to load the 3D diamond and grading card. Supports compare mode (two diamonds side-by-side).
 
-### `demo.html` — Standalone Demo
+### `public/demo.html` — Standalone Demo
 
 Hardcoded to `LG689561771`. Renders the 3D diamond with a grading overlay — no search UI, no dependencies on scraped normalized data. Parses the raw IGI JSON directly and transforms it for the geometry generator.
 
@@ -80,8 +79,8 @@ The `IGI_API_KEY` is required for PDF downloads via `fetch_igi.py`.
 Fetches the IGI verification page, extracts the embedded JSON blob with all grading data, and optionally downloads the PDF and clarity plot image.
 
 ```bash
-uv run python scrape_igi.py LG689561771 --headless
-uv run python scrape_igi.py LG689561771 --headless --with-pdf --with-plot
+uv run python scripts/scrape_igi.py LG689561771 --headless
+uv run python scripts/scrape_igi.py LG689561771 --headless --with-pdf --with-plot
 ```
 
 ### 2. Extract (`verify_pdf.py`)
@@ -89,7 +88,7 @@ uv run python scrape_igi.py LG689561771 --headless --with-pdf --with-plot
 Opens the PDF with pdfplumber, locates the clarity plot image, and saves it as `clarity_plot.png`.
 
 ```bash
-uv run python verify_pdf.py LG689561771
+uv run python scripts/verify_pdf.py LG689561771
 ```
 
 ### 3. Vectorize (`vectorize_clarity.py`)
@@ -102,14 +101,14 @@ Processes the raster clarity plot with OpenCV to extract:
 All coordinates normalized to 0-1. Output: `clarity_vectors.json`.
 
 ```bash
-uv run python vectorize_clarity.py LG689561771
+uv run python scripts/vectorize_clarity.py LG689561771
 ```
 
 ### 4. Render (browser)
 
 The HTML pages fetch the report JSON and render a parametric 3D diamond using:
-- `diamond-geometry.js` — generates BufferGeometry from proportions (table%, crown height, pavilion depth, girdle shape)
-- `diamond-material.js` — custom ShaderMaterial with BVH ray tracing for realistic refraction, dispersion, and fresnel
+- `public/js/diamond-geometry.js` — generates BufferGeometry from proportions (table%, crown height, pavilion depth, girdle shape)
+- `public/js/diamond-material.js` — custom ShaderMaterial with BVH ray tracing for realistic refraction, dispersion, and fresnel
 
 ## Deployment
 
@@ -129,10 +128,10 @@ Deployed on Vercel as a static site. Push to `main` to trigger a deploy.
 
 ## TODO
 
-- [ ] Automate IGI scraping pipeline — add a script/workflow to scrape new reports and commit the JSON to `reports/`
+- [ ] Automate IGI scraping pipeline — add a script/workflow to scrape new reports and commit the JSON to `public/data/`
 - [ ] Support more diamond shapes — currently renders cushion cut; add round brilliant, emerald, oval, pear, marquise
 - [ ] Report selector UI — let users pick from available reports or enter a report number to load
-- [ ] Clarity plot overlay — render clarity characteristics from IGI report onto the 3D model using `vectorize_clarity.py` output
+- [ ] Clarity plot overlay — render clarity characteristics from IGI report onto the 3D model using `scripts/vectorize_clarity.py` output
 - [ ] Color tinting — apply color grade (D–Z) as a subtle body tint on the diamond material
 - [ ] Mobile touch controls — improve orbit controls for mobile (pinch zoom, two-finger rotate)
 - [ ] PDF report viewer — display the IGI PDF certificate alongside the 3D diamond
