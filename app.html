@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diamond Report Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root {
+  --gold: #c9a96e;
+  --gold-light: #e8d5a8;
+  --gold-dim: #8a7044;
+  --ink: #0a0a0f;
+  --smoke: #1a1a24;
+  --pearl: #f0ede6;
+  --glass: rgba(255,255,255,0.04);
+  --glass-border: rgba(201,169,110,0.15);
+  --glass-solid: rgba(255,255,255,0.06);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  font-family: 'Outfit', sans-serif;
+  color: var(--pearl);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Atmosphere ── */
+.atmosphere {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 55%, rgba(30,28,50,0.8) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 45%, rgba(90,70,140,0.12) 0%, transparent 60%),
+    linear-gradient(180deg, #06060c 0%, #0d0d18 40%, #0a0a12 100%);
+  pointer-events: none;
+}
+
+.grain {
+  position: fixed; inset: -50%; width: 200%; height: 200%;
+  z-index: 999; pointer-events: none; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Loader ── */
+.loader-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--ink);
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+.loader-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.loader-diamond {
+  width: 36px; height: 36px; border: 1px solid var(--gold-dim);
+  transform: rotate(45deg); animation: loaderPulse 1.6s ease-in-out infinite;
+  position: relative;
+}
+.loader-diamond::after {
+  content: ''; position: absolute; inset: 5px; border: 1px solid var(--gold);
+  animation: loaderPulse 1.6s 0.3s ease-in-out infinite;
+}
+.loader-text {
+  margin-top: 28px; font-size: 10px; font-weight: 300;
+  letter-spacing: 0.4em; text-transform: uppercase; color: var(--gold-dim);
+  animation: loaderTextPulse 1.6s ease-in-out infinite;
+}
+
+/* ── Corner Lines ── */
+.corner-line { position: fixed; z-index: 10; pointer-events: none; }
+.corner-line--tl { top: 20px; left: 20px; width: 36px; height: 36px; border-top: 1px solid var(--glass-border); border-left: 1px solid var(--glass-border); }
+.corner-line--br { bottom: 20px; right: 20px; width: 36px; height: 36px; border-bottom: 1px solid var(--glass-border); border-right: 1px solid var(--glass-border); }
+
+/* ── Top Bar ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 32px; gap: 20px;
+  background: linear-gradient(180deg, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.6) 70%, transparent 100%);
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+
+.logo {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: 13px; letter-spacing: 0.35em; text-transform: uppercase;
+  color: var(--gold); white-space: nowrap;
+}
+.logo span { color: var(--gold-dim); font-weight: 400; }
+
+.search-area {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.search-input {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--pearl); font-family: 'Outfit', sans-serif;
+  font-size: 12px; font-weight: 300; letter-spacing: 0.12em;
+  padding: 8px 16px; border-radius: 2px; outline: none;
+  width: 240px; transition: border-color 0.3s ease;
+}
+.search-input:focus { border-color: var(--gold); }
+.search-input::placeholder { color: rgba(240,237,230,0.2); }
+
+.pill-btn {
+  background: var(--glass); border: 1px solid var(--glass-border);
+  color: var(--pearl); font-family: 'Outfit', sans-serif;
+  font-size: 10px; font-weight: 400; letter-spacing: 0.2em;
+  text-transform: uppercase; padding: 8px 16px; border-radius: 2px;
+  cursor: pointer; transition: all 0.3s ease; white-space: nowrap;
+}
+.pill-btn:hover { border-color: var(--gold); color: var(--gold-light); }
+.pill-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,169,110,0.08); }
+.pill-btn:disabled { opacity: 0.3; cursor: default; }
+
+.topbar-hint {
+  font-size: 10px; font-weight: 300; letter-spacing: 0.15em;
+  color: rgba(240,237,230,0.2); text-transform: uppercase; white-space: nowrap;
+}
+
+/* ── Landing State ── */
+.landing {
+  position: fixed; inset: 0; z-index: 15;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px; transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+.landing.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.landing-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: clamp(28px, 4vw, 48px); color: var(--pearl); text-align: center;
+}
+.landing-title em { font-style: italic; color: var(--gold-light); }
+
+.landing-sub {
+  font-size: 12px; font-weight: 300; letter-spacing: 0.2em;
+  text-transform: uppercase; color: rgba(240,237,230,0.3);
+}
+
+.landing-search {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+}
+.landing-search .search-input { width: 320px; font-size: 14px; padding: 12px 20px; }
+
+/* ── Main Layout ── */
+.main-content {
+  position: fixed; inset: 0; z-index: 5;
+  display: grid; grid-template-columns: 3fr 2fr;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+.main-content.visible { opacity: 1; visibility: visible; }
+
+/* ── Viewer Panel (left) ── */
+.viewer-panel {
+  position: relative; overflow: hidden;
+}
+.viewer-panel canvas {
+  width: 100% !important; height: 100% !important; display: block;
+}
+.viewer-controls {
+  position: absolute; bottom: 28px; left: 50%;
+  transform: translateX(-50%); display: flex; gap: 6px;
+  z-index: 10;
+}
+.viewer-hint {
+  position: absolute; bottom: 28px; right: 28px;
+  font-size: 10px; font-weight: 300; letter-spacing: 0.15em;
+  color: rgba(240,237,230,0.2); text-transform: uppercase; z-index: 10;
+}
+
+.brightness-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 80px; height: 1px; background: var(--glass-border);
+  outline: none; cursor: pointer; vertical-align: middle;
+}
+.brightness-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--gold); border: none; cursor: pointer;
+}
+.brightness-slider::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--gold); border: none; cursor: pointer;
+}
+.glow-label {
+  font-size: 9px; font-weight: 400; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold-dim); margin-right: 6px;
+}
+
+/* ── Grading Card (right) ── */
+.grading-card {
+  padding: 80px 36px 36px;
+  overflow-y: auto; max-height: 100vh;
+  border-left: 1px solid var(--glass-border);
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dim) transparent;
+}
+
+.shape-tag {
+  display: inline-block; font-size: 9px; font-weight: 400;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid var(--glass-border);
+  padding: 5px 12px; border-radius: 2px;
+  backdrop-filter: blur(8px); background: var(--glass);
+  margin-bottom: 14px;
+}
+
+.card-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: clamp(28px, 3vw, 42px); line-height: 1.15;
+  color: var(--pearl); margin-bottom: 4px;
+}
+.card-title em { font-style: italic; color: var(--gold-light); }
+
+.card-subtitle {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-style: italic; font-size: 14px; color: rgba(240,237,230,0.3);
+  letter-spacing: 0.02em; margin-bottom: 28px;
+}
+
+/* ── 4Cs Grid ── */
+.four-cs {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 2px; margin-bottom: 28px;
+}
+.c-item {
+  background: var(--glass-solid); padding: 16px 18px;
+  border: 1px solid var(--glass-border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.c-label {
+  font-size: 9px; font-weight: 400; letter-spacing: 0.25em;
+  text-transform: uppercase; color: var(--gold-dim);
+}
+.c-value {
+  font-family: 'Cormorant Garamond', serif; font-size: 28px;
+  font-weight: 400; color: var(--pearl); letter-spacing: 0.02em;
+}
+
+/* ── Section Headers ── */
+.section-head {
+  font-size: 9px; font-weight: 400; letter-spacing: 0.3em;
+  text-transform: uppercase; color: var(--gold-dim);
+  margin: 24px 0 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ── Spec Grid ── */
+.spec-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px 24px; margin-bottom: 8px;
+}
+.spec { display: flex; flex-direction: column; gap: 3px; }
+.spec-label {
+  font-size: 9px; font-weight: 400; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold-dim);
+}
+.spec-value {
+  font-family: 'Cormorant Garamond', serif; font-size: 17px;
+  font-weight: 400; color: var(--pearl); letter-spacing: 0.01em;
+}
+
+/* ── Measurements ── */
+.measurements {
+  display: flex; gap: 28px; margin-bottom: 8px;
+}
+
+/* ── Comments ── */
+.comments-text {
+  font-size: 12px; font-weight: 300; line-height: 1.7;
+  color: rgba(240,237,230,0.45); margin-top: 8px;
+}
+
+/* ── IGI Link ── */
+.igi-link {
+  display: inline-block; margin-top: 24px; padding: 8px 0;
+  font-size: 11px; font-weight: 400; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold-dim);
+  text-decoration: none; border-bottom: 1px solid var(--glass-border);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.igi-link:hover { color: var(--gold); border-color: var(--gold); }
+
+/* ── Error State ── */
+.error-msg {
+  position: fixed; inset: 0; z-index: 50;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; background: rgba(10,10,15,0.95);
+}
+.error-msg.visible { display: flex; }
+.error-msg h2 {
+  font-family: 'Cormorant Garamond', serif; font-weight: 300;
+  font-size: 24px; color: var(--pearl);
+}
+.error-msg p {
+  font-size: 12px; font-weight: 300; color: rgba(240,237,230,0.4);
+  max-width: 500px; text-align: center; line-height: 1.8;
+}
+.error-msg code {
+  background: var(--glass-solid); border: 1px solid var(--glass-border);
+  padding: 8px 16px; border-radius: 2px; font-size: 12px;
+  color: var(--gold-light); font-family: monospace;
+}
+
+/* ── Compare Layout ── */
+.main-content.compare-mode {
+  grid-template-columns: 1fr 1fr;
+}
+.compare-panel {
+  display: grid; grid-template-rows: 1fr auto;
+  border-right: 1px solid var(--glass-border);
+}
+.compare-panel:last-child { border-right: none; }
+.compare-panel .viewer-half { position: relative; overflow: hidden; }
+.compare-panel .viewer-half canvas { width: 100% !important; height: 100% !important; display: block; }
+.compare-panel .card-half {
+  padding: 16px 20px; max-height: 35vh; overflow-y: auto;
+  border-top: 1px solid var(--glass-border);
+}
+.compare-panel .card-half .card-title { font-size: 22px; margin-bottom: 2px; }
+.compare-panel .card-half .four-cs { gap: 1px; margin-bottom: 12px; }
+.compare-panel .card-half .c-item { padding: 10px 12px; }
+.compare-panel .card-half .c-value { font-size: 22px; }
+.compare-panel .card-half .spec-grid { gap: 8px 16px; }
+
+/* ── Animations ── */
+@keyframes loaderPulse {
+  0%,100% { opacity: 0.3; transform: rotate(45deg) scale(1); }
+  50%     { opacity: 1;   transform: rotate(45deg) scale(1.08); }
+}
+@keyframes loaderTextPulse {
+  0%,100% { opacity: 0.4; } 50% { opacity: 0.9; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .main-content { grid-template-columns: 1fr; grid-template-rows: 55vh 1fr; }
+  .grading-card { padding: 24px; border-left: none; border-top: 1px solid var(--glass-border); }
+  .main-content.compare-mode { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .topbar { padding: 16px 20px; }
+  .search-input { width: 160px; }
+  .four-cs { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="atmosphere"></div>
+<div class="grain"></div>
+<div class="corner-line corner-line--tl"></div>
+<div class="corner-line corner-line--br"></div>
+
+<!-- Loader -->
+<div class="loader-overlay hidden" id="loader">
+  <div class="loader-diamond"></div>
+  <div class="loader-text">Loading report</div>
+</div>
+
+<!-- Error -->
+<div class="error-msg" id="errorMsg">
+  <h2>Report Not Found</h2>
+  <p id="errorText">Run the scraper first to fetch this report:</p>
+  <code id="errorCmd">uv run python scrape_igi.py REPORT_NUMBER --headless</code>
+  <button class="pill-btn" onclick="hideError()" style="margin-top:16px">Back</button>
+</div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">Diamond <span>Report</span></div>
+  <div class="search-area">
+    <input class="search-input" id="topSearch" placeholder="IGI report number..." />
+    <button class="pill-btn" id="topLoadBtn">View</button>
+    <button class="pill-btn" id="compareBtn" title="Compare two diamonds" style="display:none">+ Compare</button>
+  </div>
+  <div class="topbar-hint" id="topHint">Drag to rotate &middot; Scroll to zoom</div>
+</div>
+
+<!-- Landing -->
+<div class="landing" id="landing">
+  <div class="landing-title">Diamond <em>Report Viewer</em></div>
+  <div class="landing-sub">Enter an IGI report number to begin</div>
+  <div class="landing-search">
+    <input class="search-input" id="landingSearch" placeholder="e.g. LG689561771" autofocus />
+    <button class="pill-btn" id="landingLoadBtn">View Report</button>
+  </div>
+</div>
+
+<!-- Main Content: Single Report -->
+<div class="main-content" id="mainContent">
+  <!-- Left: 3D Viewer -->
+  <div class="viewer-panel" id="viewerPanel">
+    <canvas id="diamond3d"></canvas>
+    <div class="viewer-controls">
+      <button class="pill-btn" id="btnReset">Reset View</button>
+      <span class="glow-label">Glow</span><input type="range" class="brightness-slider" id="bloomSlider" min="0" max="2" step="0.05" value="0.25" />
+    </div>
+    <div class="viewer-hint">Drag to rotate &middot; Scroll to zoom</div>
+  </div>
+
+  <!-- Right: Grading Card -->
+  <div class="grading-card" id="gradingCard">
+    <div class="shape-tag" id="shapeTag"></div>
+    <div class="card-title" id="cardTitle"></div>
+    <div class="card-subtitle" id="cardSubtitle"></div>
+
+    <div class="four-cs" id="fourCs">
+      <div class="c-item"><span class="c-label">Carat</span><span class="c-value" id="cCarat">--</span></div>
+      <div class="c-item"><span class="c-label">Color</span><span class="c-value" id="cColor">--</span></div>
+      <div class="c-item"><span class="c-label">Clarity</span><span class="c-value" id="cClarity">--</span></div>
+      <div class="c-item"><span class="c-label">Cut</span><span class="c-value" id="cCut">--</span></div>
+    </div>
+
+    <div class="section-head">Measurements</div>
+    <div class="measurements" id="measurements"></div>
+
+    <div class="section-head">Proportions</div>
+    <div class="spec-grid" id="propGrid"></div>
+
+    <div class="section-head">Finish</div>
+    <div class="spec-grid" id="finishGrid"></div>
+
+    <div class="section-head">Clarity Characteristics</div>
+    <img id="clarityPlot" style="width:100%;max-width:100%;background:#fff;border:1px solid var(--glass-border);border-radius:4px;display:none;margin-bottom:8px;" />
+
+    <div class="section-head">Details</div>
+    <div class="comments-text" id="detailsContent"></div>
+
+    <a class="igi-link" id="igiLink" href="#" target="_blank">Verify on IGI &rarr;</a>
+  </div>
+</div>
+
+<!-- Compare Content (used when in compare mode) -->
+<div class="main-content compare-mode" id="compareContent" style="opacity:0;visibility:hidden;">
+  <div class="compare-panel" id="compareLeft">
+    <div class="viewer-half"><canvas id="compareCanvas1"></canvas></div>
+    <div class="card-half" id="compareCard1"></div>
+  </div>
+  <div class="compare-panel" id="compareRight">
+    <div class="viewer-half"><canvas id="compareCanvas2"></canvas></div>
+    <div class="card-half" id="compareCard2"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/",
+    "three-mesh-bvh": "./node_modules/three-mesh-bvh/src/index.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { createDiamondGeometry, classifyShape } from './diamond-geometry.js';
+import { createDiamondMaterial } from './diamond-material.js';
+
+// ── State ──
+let currentReport = null;
+let parametricMesh = null;
+let isCompareMode = false;
+let cubeTexture = null;
+
+// ── Three.js Scene ──
+const canvas = document.getElementById('diamond3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+camera.position.set(0, 6, 14);
+
+// ── Bloom Postprocessing ──
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.4, 0.85);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+document.getElementById('bloomSlider').addEventListener('input', (e) => {
+    bloomPass.strength = parseFloat(e.target.value);
+});
+
+// ── HDRI Environment ──
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+const envPromise = new Promise((resolve) => {
+    new RGBELoader().load(
+        'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/aerodynamics_workshop_1k.hdr',
+        (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
+            const cubeRT = new THREE.WebGLCubeRenderTarget(256);
+            cubeRT.fromEquirectangularTexture(renderer, texture);
+            cubeTexture = cubeRT.texture;
+            texture.dispose();
+            pmremGenerator.dispose();
+            resolve(cubeTexture);
+        },
+        undefined,
+        () => {
+            console.warn('HDRI load failed, using fallback environment');
+            const roomScene = new RoomEnvironment(renderer);
+            scene.environment = pmremGenerator.fromScene(roomScene, 0.04).texture;
+            const cubeRT = new THREE.WebGLCubeRenderTarget(256);
+            const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRT);
+            cubeCamera.update(renderer, roomScene);
+            cubeTexture = cubeRT.texture;
+            roomScene.dispose();
+            pmremGenerator.dispose();
+            resolve(cubeTexture);
+        }
+    );
+});
+
+// Controls
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.enablePan = false;
+controls.minDistance = 5;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.58;
+controls.minPolarAngle = Math.PI * 0.15;
+controls.target.set(0, 0, 0);
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+const keyLight = new THREE.SpotLight(0xfff0dd, 60, 40, Math.PI / 5, 0.3, 1);
+keyLight.position.set(5, 12, 6);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.bias = -0.001;
+scene.add(keyLight);
+
+const fillLight = new THREE.PointLight(0xc8d8ff, 15, 30, 1.5);
+fillLight.position.set(-6, 8, -4);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xffd080, 12, 25, 1.5);
+rimLight.position.set(-3, 3, 8);
+scene.add(rimLight);
+
+const underLight = new THREE.PointLight(0x8888ff, 6, 15, 2);
+underLight.position.set(0, -3, 0);
+scene.add(underLight);
+
+// Ground
+const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(20, 64),
+    new THREE.MeshStandardMaterial({ color: 0x080810, roughness: 0.2, metalness: 0.8, envMapIntensity: 0.3 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -3;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.5, 4.5, 64),
+    new THREE.MeshStandardMaterial({ color: 0x151525, roughness: 0.05, metalness: 1.0, envMapIntensity: 0.5, transparent: true, opacity: 0.5 })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = -2.98;
+scene.add(ring);
+
+// ── Resize Handler ──
+function resizeRenderer() {
+    const panel = document.getElementById('viewerPanel');
+    const w = panel.clientWidth;
+    const h = panel.clientHeight;
+    if (w === 0 || h === 0) return;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    composer.setSize(w, h);
+}
+
+const resizeObserver = new ResizeObserver(resizeRenderer);
+resizeObserver.observe(document.getElementById('viewerPanel'));
+
+// ── Animation Loop ──
+const clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    if (parametricMesh) {
+        parametricMesh.position.y = Math.sin(t * 0.8) * 0.06;
+    }
+
+    controls.update();
+    composer.render();
+}
+animate();
+
+// ── Load Report ──
+async function loadReport(reportNumber) {
+    reportNumber = reportNumber.trim().toUpperCase();
+    if (!reportNumber) return;
+
+    showLoader();
+
+    try {
+        const resp = await fetch(`reports/${reportNumber}/${reportNumber}.json`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        currentReport = data;
+
+        populateGradingCard(data);
+        await renderParametricDiamond(data);
+
+        // Show main content
+        document.getElementById('landing').classList.add('hidden');
+        document.getElementById('mainContent').classList.add('visible');
+        document.getElementById('compareBtn').style.display = '';
+        document.getElementById('topSearch').value = reportNumber;
+
+        // Update URL hash
+        history.replaceState(null, '', `#${reportNumber}`);
+
+        hideLoader();
+        setTimeout(resizeRenderer, 100);
+
+    } catch (err) {
+        hideLoader();
+        showError(reportNumber);
+    }
+}
+
+async function renderParametricDiamond(data) {
+    if (parametricMesh) { scene.remove(parametricMesh); parametricMesh = null; }
+
+    const geometry = createDiamondGeometry(data, THREE);
+
+    // Scale to display size (~5 units)
+    geometry.computeBoundingBox();
+    const size = new THREE.Vector3();
+    geometry.boundingBox.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 5 / maxDim;
+    geometry.scale(scale, scale, scale);
+
+    await envPromise;
+
+    const { material } = createDiamondMaterial(THREE, geometry, cubeTexture, {
+        bounces: 3, ior: 2.75, aberrationStrength: 0.01, fresnel: 1.0,
+    });
+    parametricMesh = new THREE.Mesh(geometry, material);
+    scene.add(parametricMesh);
+
+    controls.target.set(0, 0, 0);
+    camera.position.set(0, 4, 12);
+    controls.update();
+}
+
+// ── Populate Grading Card ──
+function populateGradingCard(data) {
+    const origin = data.origin === 'Laboratory Grown' ? 'Lab-Grown' : 'Natural';
+    document.getElementById('shapeTag').textContent = origin;
+
+    const shapeParts = (data.shape || '').split(' ');
+    const main = capitalize(shapeParts[0] || '');
+    const sub = shapeParts.slice(1).map(capitalize).join(' ');
+    document.getElementById('cardTitle').innerHTML = `${main} <em>${sub}</em>`;
+    document.getElementById('cardSubtitle').textContent =
+        `${data.report_number} \u00B7 ${data.issue_date || ''}`;
+
+    // 4Cs
+    document.getElementById('cCarat').textContent = data.carat || '--';
+    document.getElementById('cColor').textContent = data.color_grade || '--';
+    document.getElementById('cClarity').textContent = data.clarity_grade || '--';
+    document.getElementById('cCut').textContent = data.cut_grade || 'N/A';
+
+    // Measurements
+    const meas = document.getElementById('measurements');
+    meas.innerHTML = '';
+    if (data.length_mm) {
+        for (const [label, val] of [['Length', `${data.length_mm} mm`], ['Width', `${data.width_mm} mm`], ['Depth', `${data.depth_mm} mm`]]) {
+            meas.innerHTML += `<div class="spec"><span class="spec-label">${label}</span><span class="spec-value">${val}</span></div>`;
+        }
+    }
+
+    // Proportions
+    const propGrid = document.getElementById('propGrid');
+    propGrid.innerHTML = '';
+    const p = data.proportions || {};
+    const props = [
+        ['Table', p.table_pct != null ? `${p.table_pct}%` : '--'],
+        ['Depth', p.total_depth_pct != null ? `${p.total_depth_pct}%` : '--'],
+        ['Crown Height', p.crown_height_pct != null ? `${p.crown_height_pct}%` : '--'],
+        ['Crown Angle', p.crown_angle_deg != null ? `${p.crown_angle_deg}\u00B0` : '--'],
+        ['Pavilion Depth', p.pavilion_depth_pct != null ? `${p.pavilion_depth_pct}%` : '--'],
+        ['Pavilion Angle', p.pavilion_angle_deg != null ? `${p.pavilion_angle_deg}\u00B0` : '--'],
+        ['Girdle', p.girdle || '--'],
+        ['Culet', p.culet || '--'],
+    ];
+    for (const [label, val] of props) {
+        propGrid.innerHTML += `<div class="spec"><span class="spec-label">${label}</span><span class="spec-value">${val}</span></div>`;
+    }
+
+    // Finish
+    const finishGrid = document.getElementById('finishGrid');
+    finishGrid.innerHTML = '';
+    for (const [label, val] of [['Polish', data.polish], ['Symmetry', data.symmetry], ['Fluorescence', data.fluorescence]]) {
+        finishGrid.innerHTML += `<div class="spec"><span class="spec-label">${label}</span><span class="spec-value">${val || '--'}</span></div>`;
+    }
+
+    // Details
+    const details = document.getElementById('detailsContent');
+    let detailHtml = '';
+    if (data.growth_method && data.growth_method !== 'Unknown') {
+        detailHtml += `Growth Method: ${data.growth_method}<br>`;
+    }
+    if (data.comments) {
+        detailHtml += data.comments.replace(/\r?\n/g, '<br>');
+    }
+    if (data.inscriptions) {
+        detailHtml += `<br>Inscription: ${data.inscriptions}`;
+    }
+    details.innerHTML = detailHtml;
+
+    // Clarity plot — use remote S3 URL by default, local file as override
+    const plotImg = document.getElementById('clarityPlot');
+    const localPlot = `reports/${data.report_number}/clarity_plot.jpg`;
+    const remotePlot = data.plot_image_url || '';
+    plotImg.style.display = 'none';
+    plotImg.onload = function() { this.style.display = ''; };
+    plotImg.onerror = function() { this.style.display = 'none'; };
+    if (remotePlot) {
+        plotImg.src = remotePlot;
+    }
+
+    // IGI link
+    const link = document.getElementById('igiLink');
+    link.href = data.url || '#';
+}
+
+function capitalize(s) {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+// ── Compare Mode ──
+let compareScene1 = null, compareScene2 = null;
+
+class CompareScene {
+    constructor(canvasEl) {
+        this.canvas = canvasEl;
+        this.renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, alpha: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
+
+        this.scene = new THREE.Scene();
+        this.scene.environment = scene.environment;
+
+        this.camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+        this.camera.position.set(0, 4, 12);
+
+        this.controls = new OrbitControls(this.camera, canvasEl);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.autoRotate = true;
+        this.controls.autoRotateSpeed = 1.2;
+        this.controls.enablePan = false;
+        this.controls.target.set(0, 0, 0);
+
+        // Lighting
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        const key = new THREE.SpotLight(0xfff0dd, 50, 40, Math.PI / 5, 0.4, 1);
+        key.position.set(5, 12, 6);
+        this.scene.add(key);
+        const cf = new THREE.PointLight(0xc8d8ff, 12, 30, 1.5);
+        cf.position.set(-6, 8, -4);
+        this.scene.add(cf);
+        const cr = new THREE.PointLight(0xffd080, 10, 25, 1.5);
+        cr.position.set(-3, 3, 8);
+        this.scene.add(cr);
+
+        // Ground
+        const g = new THREE.Mesh(new THREE.CircleGeometry(15, 64),
+            new THREE.MeshStandardMaterial({ color: 0x080810, roughness: 0.2, metalness: 0.8 }));
+        g.rotation.x = -Math.PI / 2; g.position.y = -3;
+        this.scene.add(g);
+
+        this.mesh = null;
+        this.running = false;
+    }
+
+    loadReport(data) {
+        if (this.mesh) { this.scene.remove(this.mesh); this.mesh = null; }
+        const geometry = createDiamondGeometry(data, THREE);
+        geometry.computeBoundingBox();
+        const size = new THREE.Vector3();
+        geometry.boundingBox.getSize(size);
+        const scale = 4 / Math.max(size.x, size.y, size.z);
+        geometry.scale(scale, scale, scale);
+        // Compare mode uses a simpler material (two-pass shader needs its own pipeline)
+        const compareMat = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff, metalness: 0.05, roughness: 0.0,
+            transmission: 0.3, thickness: 1.5, ior: 2.42,
+            envMapIntensity: 3.0, clearcoat: 1.0, specularIntensity: 2.0,
+            iridescence: 0.5, iridescenceIOR: 2.2,
+            side: THREE.DoubleSide, transparent: true, opacity: 0.9,
+        });
+        this.mesh = new THREE.Mesh(geometry, compareMat);
+        this.scene.add(this.mesh);
+    }
+
+    resize() {
+        const parent = this.canvas.parentElement;
+        if (!parent) return;
+        const w = parent.clientWidth;
+        const h = parent.clientHeight;
+        if (w === 0 || h === 0) return;
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+    }
+
+    animate() {
+        if (!this.running) return;
+        requestAnimationFrame(() => this.animate());
+        this.controls.update();
+        if (this.mesh) this.mesh.position.y = Math.sin(performance.now() * 0.0008) * 0.05;
+        this.renderer.render(this.scene, this.camera);
+    }
+
+    start() { this.running = true; this.resize(); this.animate(); }
+    stop() { this.running = false; }
+    dispose() { this.stop(); this.renderer.dispose(); }
+}
+
+function populateCompareCard(container, data) {
+    const origin = data.origin === 'Laboratory Grown' ? 'Lab-Grown' : 'Natural';
+    const shapeParts = (data.shape || '').split(' ');
+    const main = capitalize(shapeParts[0] || '');
+    const sub = shapeParts.slice(1).map(capitalize).join(' ');
+    const p = data.proportions || {};
+
+    container.innerHTML = `
+        <div class="shape-tag" style="margin-bottom:8px">${origin}</div>
+        <div class="card-title">${main} <em>${sub}</em></div>
+        <div class="card-subtitle" style="margin-bottom:12px">${data.report_number}</div>
+        <div class="four-cs">
+            <div class="c-item"><span class="c-label">Carat</span><span class="c-value">${data.carat || '--'}</span></div>
+            <div class="c-item"><span class="c-label">Color</span><span class="c-value">${data.color_grade || '--'}</span></div>
+            <div class="c-item"><span class="c-label">Clarity</span><span class="c-value">${data.clarity_grade || '--'}</span></div>
+            <div class="c-item"><span class="c-label">Cut</span><span class="c-value">${data.cut_grade || 'N/A'}</span></div>
+        </div>
+        <div class="spec-grid" style="margin-top:12px">
+            <div class="spec"><span class="spec-label">Table</span><span class="spec-value">${p.table_pct != null ? p.table_pct + '%' : '--'}</span></div>
+            <div class="spec"><span class="spec-label">Depth</span><span class="spec-value">${p.total_depth_pct != null ? p.total_depth_pct + '%' : '--'}</span></div>
+            <div class="spec"><span class="spec-label">Measurements</span><span class="spec-value">${data.measurements_mm || '--'}</span></div>
+            <div class="spec"><span class="spec-label">Polish</span><span class="spec-value">${data.polish || '--'}</span></div>
+        </div>
+    `;
+}
+
+async function enterCompareMode() {
+    const rn = prompt('Enter second IGI report number to compare:');
+    if (!rn) return;
+    const reportNum = rn.trim().toUpperCase();
+
+    try {
+        const resp = await fetch(`reports/${reportNum}/${reportNum}.json`);
+        if (!resp.ok) throw new Error('Not found');
+        const data2 = await resp.json();
+
+        // Hide single view, show compare view
+        document.getElementById('mainContent').style.opacity = '0';
+        document.getElementById('mainContent').style.visibility = 'hidden';
+        const cc = document.getElementById('compareContent');
+        cc.style.opacity = '1';
+        cc.style.visibility = 'visible';
+        isCompareMode = true;
+
+        // Set up scenes
+        if (compareScene1) compareScene1.dispose();
+        if (compareScene2) compareScene2.dispose();
+
+        compareScene1 = new CompareScene(document.getElementById('compareCanvas1'));
+        compareScene2 = new CompareScene(document.getElementById('compareCanvas2'));
+
+        compareScene1.loadReport(currentReport);
+        compareScene2.loadReport(data2);
+
+        populateCompareCard(document.getElementById('compareCard1'), currentReport);
+        populateCompareCard(document.getElementById('compareCard2'), data2);
+
+        setTimeout(() => {
+            compareScene1.start();
+            compareScene2.start();
+        }, 200);
+
+        // Change compare button to exit
+        const btn = document.getElementById('compareBtn');
+        btn.textContent = 'Exit Compare';
+        btn.onclick = exitCompareMode;
+
+    } catch (err) {
+        alert(`Could not load report ${reportNum}. Make sure you've run the scraper first.`);
+    }
+}
+
+function exitCompareMode() {
+    if (compareScene1) { compareScene1.dispose(); compareScene1 = null; }
+    if (compareScene2) { compareScene2.dispose(); compareScene2 = null; }
+
+    document.getElementById('compareContent').style.opacity = '0';
+    document.getElementById('compareContent').style.visibility = 'hidden';
+    document.getElementById('mainContent').style.opacity = '1';
+    document.getElementById('mainContent').style.visibility = 'visible';
+    isCompareMode = false;
+
+    const btn = document.getElementById('compareBtn');
+    btn.textContent = '+ Compare';
+    btn.onclick = enterCompareMode;
+
+    setTimeout(resizeRenderer, 100);
+}
+
+// ── UI Helpers ──
+function showLoader() { document.getElementById('loader').classList.remove('hidden'); }
+function hideLoader() { document.getElementById('loader').classList.add('hidden'); }
+
+function showError(reportNumber) {
+    document.getElementById('errorCmd').textContent =
+        `uv run python scrape_igi.py ${reportNumber} --headless`;
+    document.getElementById('errorMsg').classList.add('visible');
+}
+window.hideError = function() {
+    document.getElementById('errorMsg').classList.remove('visible');
+};
+
+// ── Event Bindings ──
+function doSearch(inputEl) {
+    const val = inputEl.value.trim();
+    if (val) loadReport(val);
+}
+
+document.getElementById('landingLoadBtn').addEventListener('click', () => doSearch(document.getElementById('landingSearch')));
+document.getElementById('landingSearch').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(e.target); });
+document.getElementById('topLoadBtn').addEventListener('click', () => doSearch(document.getElementById('topSearch')));
+document.getElementById('topSearch').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(e.target); });
+
+document.getElementById('btnReset').addEventListener('click', () => {
+    camera.position.set(0, 4, 12);
+    controls.target.set(0, 0, 0);
+    controls.update();
+});
+
+document.getElementById('compareBtn').addEventListener('click', enterCompareMode);
+
+// ── URL Hash ──
+const hash = window.location.hash.slice(1);
+if (hash) {
+    loadReport(hash);
+}
+</script>
+
+</body>
+</html>

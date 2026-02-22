@@ -1,0 +1,32 @@
+{
+  "report_number": "DEMO001",
+  "source": "Demo",
+  "url": "#",
+  "issue_date": "February 14, 2026",
+  "description": "DEMO DIAMOND",
+  "origin": "Laboratory Grown",
+  "shape": "OVAL BRILLIANT",
+  "measurements_mm": "9.20 x 6.80 x 4.20 mm",
+  "length_mm": 9.2,
+  "width_mm": 6.8,
+  "depth_mm": 4.2,
+  "carat": 2.01,
+  "carat_weight": "2.01 Carat",
+  "color_grade": "E",
+  "clarity_grade": "VS 1",
+  "cut_grade": "Excellent",
+  "polish": "EXCELLENT",
+  "symmetry": "VERY GOOD",
+  "fluorescence": "FAINT",
+  "proportions": {
+    "table_pct": 60.0,
+    "total_depth_pct": 61.0,
+    "crown_height_pct": 13.0,
+    "crown_angle_deg": 34.5,
+    "pavilion_depth_pct": 45.0,
+    "pavilion_angle_deg": 40.6,
+    "girdle": "THIN TO MEDIUM (FACETED)",
+    "culet": "NONE"
+  },
+  "comments": "Demo oval diamond for testing parametric geometry"
+}

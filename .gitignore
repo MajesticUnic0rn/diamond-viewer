@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# Windows artifact
+nul
+
+# Claude Code
+.claude/
+
+# Report binaries (keep .json files)
+reports/**/*.pdf
+reports/**/*.png
+reports/**/*.html
+reports/**/images/

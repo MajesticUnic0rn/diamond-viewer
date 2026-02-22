@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diamond Viewer — Cushion Cut</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+  :root {
+    --gold: #c9a96e;
+    --gold-light: #e8d5a8;
+    --gold-dim: #8a7044;
+    --ink: #0a0a0f;
+    --smoke: #1a1a24;
+    --pearl: #f0ede6;
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(201,169,110,0.15);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--ink);
+    font-family: 'Outfit', sans-serif;
+    color: var(--pearl);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Canvas ── */
+  #viewer {
+    position: fixed; inset: 0;
+    z-index: 1;
+  }
+
+  /* ── Gradient Atmosphere ── */
+  .atmosphere {
+    position: fixed; inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 55%, rgba(30,28,50,0.8) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 50% 45%, rgba(90,70,140,0.12) 0%, transparent 60%),
+      linear-gradient(180deg, #06060c 0%, #0d0d18 40%, #0a0a12 100%);
+    pointer-events: none;
+  }
+
+  /* ── Grain Overlay ── */
+  .grain {
+    position: fixed; inset: -50%;
+    width: 200%; height: 200%;
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 28px 40px;
+    pointer-events: none;
+  }
+
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 13px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--gold);
+    opacity: 0;
+    animation: fadeSlideDown 1s 0.6s ease forwards;
+  }
+
+  .logo span {
+    color: var(--gold-dim);
+    font-weight: 400;
+  }
+
+  .controls-hint {
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: rgba(240,237,230,0.25);
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeSlideDown 1s 1s ease forwards;
+  }
+
+  /* ── Info Panel ── */
+  .info-panel {
+    position: fixed;
+    bottom: 48px;
+    left: 40px;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    animation: fadeSlideUp 1.2s 1.2s ease forwards;
+  }
+
+  .info-panel .shape-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid var(--glass-border);
+    padding: 6px 14px;
+    border-radius: 2px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(8px);
+    background: var(--glass);
+  }
+
+  .info-panel h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(32px, 4.5vw, 56px);
+    line-height: 1.1;
+    color: var(--pearl);
+    margin-bottom: 6px;
+  }
+
+  .info-panel h1 em {
+    font-style: italic;
+    color: var(--gold-light);
+  }
+
+  .info-panel .subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: 16px;
+    color: rgba(240,237,230,0.35);
+    margin-bottom: 28px;
+    letter-spacing: 0.02em;
+  }
+
+  .specs {
+    display: flex;
+    gap: 36px;
+  }
+
+  .spec {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .spec-label {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+  }
+
+  .spec-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--pearl);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Brightness Slider ── */
+  .brightness-control {
+    position: fixed;
+    bottom: 48px;
+    right: 100px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    animation: fadeSlideUp 1s 1.4s ease forwards;
+  }
+
+  .brightness-label {
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+  }
+
+  .brightness-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    height: 1px;
+    background: var(--glass-border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .brightness-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: none;
+    cursor: pointer;
+  }
+
+  .brightness-slider::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: none;
+    cursor: pointer;
+  }
+
+  /* ── Right Vertical Label ── */
+  .vertical-label {
+    position: fixed;
+    right: 40px;
+    bottom: 48px;
+    z-index: 10;
+    writing-mode: vertical-rl;
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(240,237,230,0.15);
+    pointer-events: none;
+    opacity: 0;
+    animation: fadeSlideUp 1s 1.6s ease forwards;
+  }
+
+  /* ── Decorative Lines ── */
+  .corner-line {
+    position: fixed;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .corner-line--tl {
+    top: 24px; left: 24px;
+    width: 40px; height: 40px;
+    border-top: 1px solid var(--glass-border);
+    border-left: 1px solid var(--glass-border);
+    animation: fadeIn 1s 1.8s ease forwards;
+  }
+
+  .corner-line--br {
+    bottom: 24px; right: 24px;
+    width: 40px; height: 40px;
+    border-bottom: 1px solid var(--glass-border);
+    border-right: 1px solid var(--glass-border);
+    animation: fadeIn 1s 2s ease forwards;
+  }
+
+  /* ── Loader ── */
+  .loader-overlay {
+    position: fixed; inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--ink);
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+
+  .loader-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .loader-diamond {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--gold-dim);
+    transform: rotate(45deg);
+    animation: loaderPulse 1.6s ease-in-out infinite;
+    position: relative;
+  }
+
+  .loader-diamond::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid var(--gold);
+    animation: loaderPulse 1.6s 0.3s ease-in-out infinite;
+  }
+
+  .loader-text {
+    margin-top: 32px;
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    animation: loaderTextPulse 1.6s ease-in-out infinite;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes loaderPulse {
+    0%, 100% { opacity: 0.3; transform: rotate(45deg) scale(1); }
+    50%      { opacity: 1;   transform: rotate(45deg) scale(1.08); }
+  }
+
+  @keyframes loaderTextPulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.9; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .topbar { padding: 20px 24px; }
+    .info-panel { left: 24px; bottom: 32px; }
+    .specs { gap: 24px; }
+    .vertical-label { display: none; }
+    .corner-line--tl { top: 16px; left: 16px; }
+    .corner-line--br { bottom: 16px; right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="atmosphere"></div>
+<div class="grain"></div>
+
+<!-- Loader -->
+<div class="loader-overlay" id="loader">
+  <div class="loader-diamond"></div>
+  <div class="loader-text">Preparing your stone</div>
+</div>
+
+<!-- Corner Lines -->
+<div class="corner-line corner-line--tl"></div>
+<div class="corner-line corner-line--br"></div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">Diamond <span>Viewer</span></div>
+  <div class="controls-hint">Drag to rotate &middot; Scroll to zoom</div>
+</div>
+
+<!-- Info Panel -->
+<div class="info-panel">
+  <div class="shape-tag">Lab-Grown</div>
+  <h1>Cushion <em>Cut</em></h1>
+  <div class="subtitle">Brilliant faceting &middot; exceptional symmetry</div>
+  <div class="specs">
+    <div class="spec">
+      <span class="spec-label">Length</span>
+      <span class="spec-value">6.68 mm</span>
+    </div>
+    <div class="spec">
+      <span class="spec-label">Width</span>
+      <span class="spec-value">5.46 mm</span>
+    </div>
+    <div class="spec">
+      <span class="spec-label">Depth</span>
+      <span class="spec-value">3.65 mm</span>
+    </div>
+  </div>
+</div>
+
+<!-- Brightness Slider -->
+<div class="brightness-control">
+  <span class="brightness-label">Glow</span>
+  <input type="range" class="brightness-slider" id="bloomSlider" min="0" max="2" step="0.05" value="0.5" />
+</div>
+
+<!-- Vertical Label -->
+<div class="vertical-label">Three-Dimensional Inspection</div>
+
+<!-- Three.js Canvas -->
+<canvas id="viewer"></canvas>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.0/src/index.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { createDiamondGeometry } from './diamond-geometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { createDiamondMaterial } from './diamond-material.js';
+
+// ── Setup ──
+const canvas  = document.getElementById('viewer');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 6, 14);
+
+// ── Bloom Postprocessing ──
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.5, 0.4, 0.85
+);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+document.getElementById('bloomSlider').addEventListener('input', (e) => {
+    bloomPass.strength = parseFloat(e.target.value);
+});
+
+// ── HDRI Environment ──
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+let loadedCubeTexture = null;
+let loadedGeometry = null;
+let diamondMesh = null;
+
+function tryCreateDiamond() {
+    if (!loadedCubeTexture || !loadedGeometry) return;
+    const { material } = createDiamondMaterial(THREE, loadedGeometry, loadedCubeTexture, {
+        bounces: 3, ior: 2.75, aberrationStrength: 0.01, fresnel: 1.0,
+    });
+    diamondMesh = new THREE.Mesh(loadedGeometry, material);
+    diamondMesh.position.y = 2.8;
+    scene.add(diamondMesh);
+    camera.lookAt(0, 2.5, 0);
+    controls.target.set(0, 2.5, 0);
+    controls.update();
+    setTimeout(() => document.getElementById('loader').classList.add('hidden'), 600);
+}
+
+new RGBELoader().load(
+    'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/aerodynamics_workshop_1k.hdr',
+    (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = pmremGenerator.fromEquirectangular(texture).texture;
+        const cubeRT = new THREE.WebGLCubeRenderTarget(256);
+        cubeRT.fromEquirectangularTexture(renderer, texture);
+        loadedCubeTexture = cubeRT.texture;
+        texture.dispose();
+        pmremGenerator.dispose();
+        tryCreateDiamond();
+    },
+    undefined,
+    (err) => {
+        console.warn('HDRI load failed, using fallback:', err);
+        const roomScene = new RoomEnvironment(renderer);
+        scene.environment = pmremGenerator.fromScene(roomScene, 0.04).texture;
+        const cubeRT = new THREE.WebGLCubeRenderTarget(256);
+        const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRT);
+        cubeCamera.update(renderer, roomScene);
+        loadedCubeTexture = cubeRT.texture;
+        roomScene.dispose();
+        pmremGenerator.dispose();
+        tryCreateDiamond();
+    }
+);
+
+// ── Controls ──
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.enablePan = false;
+controls.minDistance = 5;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.58;
+controls.minPolarAngle = Math.PI * 0.15;
+controls.target.set(0, 1.5, 0);
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+const keyLight = new THREE.SpotLight(0xfff0dd, 60, 40, Math.PI / 5, 0.3, 1);
+keyLight.position.set(5, 12, 6);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.bias = -0.001;
+scene.add(keyLight);
+
+const fillLight = new THREE.PointLight(0xc8d8ff, 15, 30, 1.5);
+fillLight.position.set(-6, 8, -4);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xffd080, 12, 25, 1.5);
+rimLight.position.set(-3, 3, 8);
+scene.add(rimLight);
+
+// ── Ground Plane ──
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(20, 64),
+  new THREE.MeshStandardMaterial({ color: 0x080810, roughness: 0.2, metalness: 0.8, envMapIntensity: 0.3 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(1.5, 4.5, 64),
+  new THREE.MeshStandardMaterial({ color: 0x151525, roughness: 0.05, metalness: 1.0, envMapIntensity: 0.5, transparent: true, opacity: 0.5 })
+);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = -0.02;
+scene.add(ring);
+
+// ── Parse raw IGI JSON into the format diamond-geometry.js expects ──
+function parseReport(r) {
+    const mParts = (r['Measurements'] || '').match(/[\d.]+/g) || [];
+    const length_mm = parseFloat(mParts[0]) || 6.5;
+    const width_mm  = parseFloat(mParts[1]) || length_mm;
+    const depth_mm  = parseFloat(mParts[2]) || 0;
+    const pf = s => parseFloat((s || '').match(/[\d.]+/)?.[0]) || 0;
+
+    return {
+        report_number: r['REPORT NUMBER'],
+        shape: r['SHAPE AND CUT'] || '',
+        carat: r['CARAT WEIGHT'] || '',
+        color_grade: r['COLOR GRADE'] || '',
+        clarity_grade: r['CLARITY GRADE'] || '',
+        cut_grade: r['CUT GRADE'] || '',
+        length_mm, width_mm, depth_mm,
+        proportions: {
+            table_pct: pf(r['Table Size']),
+            crown_height_pct: pf(r['Crown Height']),
+            pavilion_depth_pct: pf(r['Pavilion Depth']),
+            total_depth_pct: pf(r['Total Depth']),
+            girdle: r['Girdle Thickness'] || '',
+            culet: r['Culet'] || '',
+        },
+    };
+}
+
+// ── Load Report + Generate Parametric Geometry ──
+fetch('reports/LG689561771/LG689561771.json')
+  .then(r => r.json())
+  .then(raw => {
+    const data = parseReport(raw);
+    const geometry = createDiamondGeometry(data, THREE);
+    geometry.computeBoundingBox();
+    const size = new THREE.Vector3();
+    geometry.boundingBox.getSize(size);
+    const scale = 5 / Math.max(size.x, size.y, size.z);
+    geometry.scale(scale, scale, scale);
+
+    loadedGeometry = geometry;
+    tryCreateDiamond();
+  })
+  .catch(err => {
+    console.error('Error loading report:', err);
+    document.querySelector('.loader-text').textContent = 'Error loading report';
+  });
+
+// ── Animate ──
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if (diamondMesh) {
+    diamondMesh.position.y = 2.8 + Math.sin(t * 0.8) * 0.08;
+  }
+
+  controls.update();
+  composer.render();
+}
+
+animate();
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
